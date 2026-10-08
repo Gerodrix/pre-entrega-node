@@ -1,120 +1,104 @@
 const API_URL = 'https://fakestoreapi.com';
+const [metodoIngresado, recurso, ...datos] = process.argv.slice(2);
+const metodo = metodoIngresado?.toUpperCase();
 
-const AYUDA = `Uso:
+async function solicitar(recurso, opciones = {}) {
+  const respuesta = await fetch(`${API_URL}/${recurso}`, {
+    method: 'GET',
+    ...opciones,
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!respuesta.ok) {
+    throw new Error(`La API respondió con un error HTTP ${respuesta.status}.`);
+  }
+  const resultado = await respuesta.json();
+  if (resultado === null || (recurso.includes('/') && !resultado?.id)) {
+    throw new Error('No se encontró el producto solicitado.');
+  }
+  console.log(JSON.stringify(resultado, null, 2));
+}
+
+async function listarProductos() {
+  await solicitar('products');
+}
+
+async function consultarProducto(id) {
+  await solicitar(`products/${id}`);
+}
+
+async function crearProducto(title, price, category) {
+  await solicitar('products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, price, category }),
+  });
+}
+
+async function eliminarProducto(id) {
+  await solicitar(`products/${id}`, { method: 'DELETE' });
+}
+
+function mostrarAyuda() {
+  console.log(`Uso:
   npm run start GET products
-  npm run start GET products/<productId>
+  npm run start GET products/<id>
   npm run start POST products <title> <price> <category>
-  npm run start DELETE products/<productId>
+  npm run start DELETE products/<id>`);
+}
 
-Ejemplos:
-  npm run start GET products/15
-  npm run start POST products "T-Shirt Rex" 300 remeras
-  npm run start DELETE products/7
-
-Usá comillas si el título o la categoría contienen espacios.
-Para ver esta ayuda: npm run start -- --help`;
-
-function interpretarComando(argumentos) {
-  const [metodoIngresado, recurso, ...datos] = argumentos;
-  const metodo = metodoIngresado?.toUpperCase();
-
+async function main() {
+  if (['--help', '-h'].includes(metodoIngresado) && recurso === undefined) {
+    mostrarAyuda();
+    return;
+  }
   if (!['GET', 'POST', 'DELETE'].includes(metodo)) {
     throw new Error('Indicá un método válido: GET, POST o DELETE.');
   }
-
-  const [coleccion, id, ...segmentosExtra] = (recurso ?? '').split('/');
-  if (coleccion !== 'products' || segmentosExtra.length > 0) {
-    throw new Error('El recurso debe ser products o products/<productId>.');
+  const [coleccion, id, ...extra] = (recurso ?? '').split('/');
+  if (coleccion !== 'products' || extra.length > 0) {
+    throw new Error('El recurso debe ser products o products/<id>.');
   }
-
   if (id !== undefined && (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id)))) {
     throw new Error('El ID debe ser un número entero positivo.');
   }
-
   if (metodo === 'POST') {
     if (id !== undefined || datos.length !== 3) {
       throw new Error('Para crear: POST products <title> <price> <category>.');
     }
-
-    const [tituloIngresado, precioIngresado, categoriaIngresada] = datos;
-    const title = tituloIngresado.trim();
-    const category = categoriaIngresada.trim();
-    const price = Number(precioIngresado);
-
-    if (!title || !category) {
+    const [title, price, category] = datos;
+    if (!title.trim() || !category.trim()) {
       throw new Error('El título y la categoría no pueden estar vacíos.');
     }
-    if (!precioIngresado.trim() || !Number.isFinite(price) || price < 0) {
-      throw new Error('El precio debe ser un número mayor o igual a cero. Usá punto para los decimales.');
+    if (!price.trim() || !Number.isFinite(Number(price)) || Number(price) < 0) {
+      throw new Error('El precio debe ser un número mayor o igual a cero.');
     }
-
-    return { metodo, recurso, producto: { title, price, category } };
-  }
-
-  if (datos.length > 0) {
-    throw new Error('GET y DELETE no aceptan datos adicionales.');
-  }
-  if (metodo === 'DELETE' && id === undefined) {
-    throw new Error('Para eliminar: DELETE products/<productId>.');
-  }
-
-  return { metodo, recurso };
-}
-
-async function gestionarProductos({ metodo, recurso, producto }) {
-  const opciones = {
-    method: metodo,
-    signal: AbortSignal.timeout(15000),
-  };
-
-  if (producto) {
-    opciones.headers = { 'Content-Type': 'application/json' };
-    opciones.body = JSON.stringify({ ...producto, description: '', image: '' });
-  }
-
-  const respuesta = await fetch(`${API_URL}/${recurso}`, opciones);
-  if (!respuesta.ok) {
-    throw new Error(`La API respondió con un error HTTP ${respuesta.status}.`);
-  }
-
-  // Un ID inexistente puede devolver una respuesta vacía.
-  const contenido = await respuesta.text();
-  if (!contenido.trim()) {
-    throw new Error('La API no devolvió datos. Verificá que el producto exista.');
-  }
-
-  let resultado;
-  try {
-    resultado = JSON.parse(contenido);
-  } catch {
-    throw new Error('La API devolvió una respuesta que no es JSON válido.');
-  }
-  if (resultado === null || (recurso.includes('/') && !resultado?.id)) {
-    throw new Error('No se encontró el producto solicitado.');
-  }
-
-  console.log(JSON.stringify(resultado, null, 2));
-}
-
-// Los primeros dos argumentos son las rutas de Node y de este archivo.
-const argumentos = process.argv.slice(2);
-
-try {
-  if (argumentos.length === 1 && ['--help', '-h'].includes(argumentos[0])) {
-    console.log(AYUDA);
+    await crearProducto(title.trim(), Number(price), category.trim());
   } else {
-    const comando = interpretarComando(argumentos);
-    await gestionarProductos(comando);
+    if (datos.length > 0) {
+      throw new Error('GET y DELETE no aceptan datos adicionales.');
+    }
+    if (metodo === 'GET' && id === undefined) {
+      await listarProductos();
+    } else if (metodo === 'GET') {
+      await consultarProducto(id);
+    } else if (id !== undefined) {
+      await eliminarProducto(id);
+    } else {
+      throw new Error('Para eliminar: DELETE products/<id>.');
+    }
   }
-} catch (error) {
+}
+
+main().catch((error) => {
   let mensaje = error.message;
   if (error.name === 'TimeoutError') {
-    mensaje = 'La API tardó más de 15 segundos en responder. Intentá nuevamente.';
+    mensaje = 'La API tardó más de 15 segundos en responder.';
+  } else if (error.name === 'SyntaxError') {
+    mensaje = 'La API no devolvió datos JSON válidos. Verificá que el producto exista.';
   } else if (error.message === 'fetch failed') {
-    mensaje = 'No se pudo conectar con FakeStore API. Revisá tu conexión e intentá nuevamente.';
+    mensaje = 'No se pudo conectar con FakeStore API.';
   }
-
   console.error(`Error: ${mensaje}`);
-  console.error('\n' + AYUDA);
+  mostrarAyuda();
   process.exitCode = 1;
-}
+});
