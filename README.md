@@ -28,3 +28,17 @@ muestra un mensaje y los usos válidos.
 
 [Documentación de FakeStore API](https://fakestoreapi.com/docs).
 Las creaciones y eliminaciones son simuladas y no persisten en la API.
+
+## Validación local
+
+```sh
+npm ci
+npm run check
+npm test
+```
+
+Las pruebas ejecutan la CLI con respuestas HTTP simuladas: verifican argumentos, métodos, payloads, errores y códigos de salida sin depender de la disponibilidad de FakeStore API. El nombre del repositorio conserva el contexto de la entrega académica.
+
+## Contribuir
+
+Ver [CONTRIBUTING.md](CONTRIBUTING.md).
