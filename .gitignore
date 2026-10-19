@@ -1,2 +1,10 @@
 node_modules/
 *.log
+
+# Local credentials and editor state
+.env.*
+!.env.example
+.dev.vars*
+!.dev.vars.example
+.vs/
+*.tsbuildinfo

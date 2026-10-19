@@ -4,14 +4,20 @@
   "description": "Gestión de productos desde la terminal con Node.js y FakeStore API",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "check": "node --check index.js",
+    "test": "node --test"
   },
   "keywords": [],
-  "author": "",
+  "author": "Gerónimo Odriozola",
   "license": "ISC",
   "type": "module",
   "private": true,
   "engines": {
     "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gerodrix/pre-entrega-node.git"
   }
 }
